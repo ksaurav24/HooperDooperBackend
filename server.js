@@ -3,7 +3,7 @@ const express = require("express");
 const cors = require("cors");
 const passport = require("passport");
 const app = express();
-const port = 5500;
+const port = 5000;
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 
@@ -39,9 +39,7 @@ app.use(cors());
 
 app.use("/auth", require("./routes/auth.js"));
 
-mongoose.connect(
-  "mongodb+srv://Saurav24:Saurav%400101@demo.pgh4rhh.mongodb.net/hooperDooper"
-);
+mongoose.connect(process.env.MONGO_URI);
 
 app.post(
   "/login",
