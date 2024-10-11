@@ -19,6 +19,7 @@ const registrationMail = async (options) => {
 
   // Generate a verification key
   const verificationKey = uuidv4();
+  const verificationLink = `http://localhost:3000/auth/verify-email/${verificationKey}`;
   // get the current date and add 1 hour to it
   const date = Date.now();
   const verificationKeyExpiry = date + 3600000;
@@ -40,7 +41,80 @@ const registrationMail = async (options) => {
     //   we can simply use array for multiple users
     subject: "Welcome to Codement! Verify your email",
     text: options.text,
-    html: `<h1>Please verify your email by</h1> <a href="http://localhost:5000/verifymail/${verificationKey}> Clicking Here </a>`,
+    html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Verification - Hooper Dooper</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        .header {
+            background-color: #0A4ADC; /* Hooper Dooper brand color */
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+        }
+        .content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 0 0 10px 10px;
+        }
+        .button-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .verify-button {
+            background-color: #0A4ADC;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            font-size: 18px;
+            border-radius: 5px;
+        }
+        .verify-button:hover {
+            background-color: #08389C;
+        }
+        .footer {
+            font-size: 12px;
+            color: #777;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Verify Your Email</h1>
+    </div>
+    <div class="content">
+        <p>Hi there,</p>
+
+        <p>Thank you for registering with Hooper Dooper! Please verify your email address by clicking the button below. The verification link will expire in 15 minutes, so be sure to confirm your email promptly.</p>
+
+        <div class="button-container">
+            <a href="${verificationLink}" class="verify-button">Click Here to Verify Your Email</a>
+        </div>
+
+        <p>If you did not sign up for this account, you can safely ignore this email.</p>
+
+        <p>Best regards,<br>The Hooper Dooper Team</p>
+
+        <div class="footer">
+            <p>Please note: This link will expire in 15 minutes. If the link has expired, you can request a new verification email.</p>
+        </div>
+    </div>
+</body>
+</html>
+`,
   };
 
   const info = await transporter.sendMail(mailOptions);

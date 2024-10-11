@@ -60,34 +60,35 @@ const userSchema = new mongoose.Schema(
       required: false,
       default: null,
     },
-    address: {
+
+    country: {
       type: String,
-      required: false,
-      default: null,
+      default: "",
     },
-    firstName: {
-      type: String,
-      required: true,
-      default: null,
-    },
-    lastName: {
-      type: String,
-      required: false,
-      default: null,
-    },
-    role: {
+    fullName: {
       type: String,
       required: true,
-      default: "user",
+      default: null,
     },
-    cart: {
-      type: Array,
-      default: [],
+    isAdmin: {
+      type: Boolean,
+      required: true,
+      default: false,
     },
-    wishlist: {
-      type: Array,
-      default: [],
-    },
+    cart: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "OrderItem",
+        default: [],
+      },
+    ],
+    wishlist: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Product",
+        default: [],
+      },
+    ],
   },
   {
     timestamps: true,

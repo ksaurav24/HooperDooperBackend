@@ -1,35 +1,56 @@
-const { timeStamp } = require("console");
 const mongoose = require("mongoose");
 
 const orderSchema = mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
+    orderId: {
+      type: String,
       required: true,
-      ref: "User",
     },
-    product: {
-      type: mongoose.Schema.Types.ObjectId,
+    orderItems: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "OrderItem",
+        required: true,
+      },
+    ],
+    shippingAddress1: {
+      type: String,
       required: true,
-      ref: "Product",
     },
-    quantity: {
-      type: Number,
+    shippingAddress2: {
+      type: String,
+    },
+    city: {
+      type: String,
       required: true,
-      default: 1,
     },
-    address: {
+    zip: {
+      type: String,
+      required: true,
+    },
+    country: {
+      type: String,
+      required: true,
+    },
+    phone: {
       type: String,
       required: true,
     },
     status: {
       type: String,
       required: true,
-      default: "pending",
+      default: "Pending",
     },
     totalPrice: {
       type: Number,
-      required: true,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
+    dateOrdered: {
+      type: Date,
+      default: Date.now(),
     },
     paymentMethod: {
       type: String,
@@ -38,9 +59,6 @@ const orderSchema = mongoose.Schema(
     transactionId: {
       type: String,
       required: true,
-    },
-    deliveredAt: {
-      type: Date,
     },
   },
   {
