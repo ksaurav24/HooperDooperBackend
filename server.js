@@ -8,7 +8,8 @@ const port = 5000;
 const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const helmet = require("helmet");
-app.use(helmet());
+const jwt = require("jsonwebtoken");
+// app.use(helmet());
 
 const rateLimit = require("express-rate-limit");
 const limiter = rateLimit({
@@ -39,6 +40,7 @@ const Order = require("./models/ordersModel.js");
 const OrderItem = require("./models/orderItem.model.js");
 const Ticket = require("./models/ticket.Model.js");
 const isVerified = require("./middlewares/isVerified.middleware.js");
+const verifyJwt = require("./middlewares/verifyJwt.js");
 
 initializingPassport(passport);
 app.use(
@@ -47,37 +49,68 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // HTTPS-only
-      httpOnly: true, // Prevent client-side JavaScript from accessing cookies
-      sameSite: "strict", // Prevent CSRF
+      // secure: true, // HTTPS-only
+      // httpOnly: true, // Prevent client-side JavaScript from accessing cookies
+      // sameSite: "strict", // Prevent CSRF
     },
   })
 );
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
-
-app.use(passport.session());
 app.use(passport.initialize());
-app.use(cors());
+app.use(passport.session());
+
+app.use(cors(
+  {
+    origin: "http://localhost:5173",
+    credentials: true,
+  }
+));
 
 app.use("/auth", require("./routes/auth.js"));
 
 mongoose.connect(process.env.MONGO_URI);
 
-app.post(
-  "/login",
-  loginInputValidation,
-  passport.authenticate("local"),
-  (req, res) => {
+app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please login with google",
+      });
+    }
+    if (!(await bcrypt.compare(password, user.password))) {
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect password",
+      });
+    }
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+      expiresIn: "1d",
+    });
     res.status(200).json({
       success: true,
-      message: "Logged in Successfully",
-      user: req.user._id,
+      message: "Logged in",
+      token: token,
     });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to login",
+    });
+    console.log(error);
   }
-);
+});
 
-app.get("auth/v1/logout", (req, res) => {
+app.get("/auth/v1/logout", (req, res) => {
   try {
     req.logout(() => {
       res.status(200).json({
@@ -193,7 +226,33 @@ app.get("/auth/verify-email/:verificationKey", async (req, res) => {
   }
 });
 
-app.get("/isauthenticated", (req, res) => {
+// profile route
+app.get("/profile", verifyJwt, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
+    );
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    res.status(200).json({
+      success: true,
+      message: "User found",
+      data: user,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to get user",
+    });
+    console.log(error);
+  }
+});
+
+app.get("/isauthenticated", verifyJwt, (req, res) => {
   if (req.user) {
     return res.status(200).json({
       authenticated: true,
@@ -210,7 +269,7 @@ app.get("/isauthenticated", (req, res) => {
 // Order Routes
 app.post(
   "/order/new",
-  isAuthenticated,
+  verifyJwt,
   isVerified,
   validateOrderInput,
   async (req, res) => {
@@ -284,7 +343,7 @@ app.post(
 );
 
 // Delete order by orderId
-app.delete("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
+app.delete("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -322,7 +381,7 @@ app.delete("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
 
 // Get order by orderId
 
-app.get("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
+app.get("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -352,7 +411,7 @@ app.get("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
 });
 
 // Get all orders
-app.get("/orders", isAuthenticated, isVerified, async (req, res) => {
+app.get("/orders", verifyJwt, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orders = await Order.find({ userId: userId }).populate(
@@ -376,7 +435,7 @@ app.get("/orders", isAuthenticated, isVerified, async (req, res) => {
 // cart and wishlist routes
 
 // Add product to cart
-app.post("/cart/add", isAuthenticated, isVerified, async (req, res) => {
+app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderItem = new OrderItem({
@@ -404,7 +463,7 @@ app.post("/cart/add", isAuthenticated, isVerified, async (req, res) => {
 // Remove product from cart
 app.delete(
   "/cart/remove/:productId",
-  isAuthenticated,
+  verifyJwt,
   isVerified,
   async (req, res) => {
     try {
@@ -433,7 +492,7 @@ app.delete(
 
 // Add product to wishlist
 
-app.post("/wishlist/add", isAuthenticated, isVerified, async (req, res) => {
+app.post("/wishlist/add", verifyJwt, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const productId = req.body.productId;
@@ -472,7 +531,7 @@ app.post("/wishlist/add", isAuthenticated, isVerified, async (req, res) => {
 
 app.post(
   "/ticket/new",
-  isAuthenticated,
+  verifyJwt,
   isVerified,
   validateTicketInput,
   async (req, res) => {
@@ -506,7 +565,7 @@ app.post(
 // Admin Routes
 
 // update order status
-app.put("/admin/order/:orderId", isAuthenticated, isAdmin, async (req, res) => {
+app.put("/admin/order/:orderId", verifyJwt, isAdmin, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -543,7 +602,7 @@ app.put("/admin/order/:orderId", isAuthenticated, isAdmin, async (req, res) => {
 });
 
 // Get all orders
-app.get("/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
+app.get("/admin/orders", verifyJwt, isAdmin, async (req, res) => {
   try {
     const orders = await Order.find();
     res.status(200).json({
@@ -561,7 +620,7 @@ app.get("/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
 });
 
 // Get all users
-app.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
+app.get("/admin/users", verifyJwt, isAdmin, async (req, res) => {
   try {
     const users = await User.find().select(
       "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
@@ -581,7 +640,7 @@ app.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
 });
 
 // Get user by userId
-app.get("/admin/user/:userId", isAuthenticated, isAdmin, async (req, res) => {
+app.get("/admin/user/:userId", verifyJwt, isAdmin, async (req, res) => {
   try {
     const userId = req.params.userId;
     const user = await User.findById(userId).select(
@@ -609,7 +668,7 @@ app.get("/admin/user/:userId", isAuthenticated, isAdmin, async (req, res) => {
 
 // get all tickets
 
-app.get("/admin/tickets", isAuthenticated, isAdmin, async (req, res) => {
+app.get("/admin/tickets", verifyJwt, isAdmin, async (req, res) => {
   try {
     const tickets = await Ticket.find();
     res.status(200).json({
@@ -628,67 +687,57 @@ app.get("/admin/tickets", isAuthenticated, isAdmin, async (req, res) => {
 
 // get ticket by ticketId
 
-app.get(
-  "/admin/ticket/:ticketId",
-  isAuthenticated,
-  isAdmin,
-  async (req, res) => {
-    try {
-      const ticketId = req.params.ticketId;
-      const ticket = await Ticket.findById(ticketId);
-      if (!ticket) {
-        res.status(404).json({
-          success: false,
-          message: "Ticket not found",
-        });
-      }
-      res.status(200).json({
-        success: true,
-        message: "Ticket found",
-        data: ticket,
-      });
-    } catch (error) {
-      res.status(400).json({
+app.get("/admin/ticket/:ticketId", verifyJwt, isAdmin, async (req, res) => {
+  try {
+    const ticketId = req.params.ticketId;
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) {
+      res.status(404).json({
         success: false,
-        message: "Failed to get ticket",
+        message: "Ticket not found",
       });
-      console.log(error);
     }
+    res.status(200).json({
+      success: true,
+      message: "Ticket found",
+      data: ticket,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to get ticket",
+    });
+    console.log(error);
   }
-);
+});
 
 // update ticket status
 
-app.put(
-  "/admin/ticket/:ticketId",
-  isAuthenticated,
-  isAdmin,
-  async (req, res) => {
-    try {
-      const ticketId = req.params.ticketId;
-      const ticket = await Ticket.findById(ticketId);
-      if (!ticket) {
-        res.status(404).json({
-          success: false,
-          message: "Ticket not found",
-        });
-      }
-      ticket.status = req.body.status;
-      await ticket.save();
-      res.status(200).json({
-        success: true,
-        message: "Ticket status updated successfully",
-        data: ticket,
-      });
-    } catch (error) {
-      res.status(400).json({
+app.put("/admin/ticket/:ticketId", verifyJwt, isAdmin, async (req, res) => {
+  try {
+    const ticketId = req.params.ticketId;
+    const ticket = await Ticket.findById(ticketId);
+    if (!ticket) {
+      res.status(404).json({
         success: false,
-        message: "Failed to update ticket status",
+        message: "Ticket not found",
       });
-      console.log(error);
     }
+    ticket.status = req.body.status;
+    await ticket.save();
+    res.status(200).json({
+      success: true,
+      message: "Ticket status updated successfully",
+      data: ticket,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to update ticket status",
+    });
+    console.log(error);
   }
-);
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

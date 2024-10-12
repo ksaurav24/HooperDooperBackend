@@ -45,12 +45,14 @@ exports.initializingPassport = async (passport) => {
 };
 
 exports.isAuthenticated = (req, res, next) => {
+  console.log("user :" + req.user);
+  console.log(req.session);
   if (req.user) {
     return next();
   }
   res.status(401).json({
     authenticated: false,
-    message: "user not authenticated",
+    message: "user not authenticated apun ka error",
   });
 };
 
