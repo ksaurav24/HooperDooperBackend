@@ -1,6 +1,6 @@
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-const User = require("./models/userModel");
+const User = require("./models/userModel.js");
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -8,8 +8,10 @@ const bcrypt = require("bcrypt");
 exports.initializingPassport = async (passport) => {
   passport.use(
     new LocalStrategy(async function (username, password, done) {
+      console.log(username);
       const user = await User.findOne({ username });
       try {
+        console.log(user);
         if (!user) {
           return done(null, false, { message: "user not found" });
         }

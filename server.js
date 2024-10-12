@@ -65,7 +65,7 @@ app.use("/auth", require("./routes/auth.js"));
 mongoose.connect(process.env.MONGO_URI);
 
 app.post(
-  "auth/v1/login",
+  "/login",
   loginInputValidation,
   passport.authenticate("local"),
   (req, res) => {
