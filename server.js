@@ -73,8 +73,8 @@ mongoose.connect(process.env.MONGO_URI);
 
 app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
   try {
-    const { username, password } = req.body;
-    const user = await User.findOne({ username });
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({
         success: false,

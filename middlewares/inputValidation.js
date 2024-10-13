@@ -21,7 +21,7 @@ const registerInputValidation = (req, res, next) => {
 };
 
 const loginInputSchema = zod.object({
-  username: zod.string().min(6),
+  email: zod.string().email().min(6),
   password: zod.string().min(6),
 });
 
