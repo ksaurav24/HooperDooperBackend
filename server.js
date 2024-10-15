@@ -9,7 +9,7 @@ const bcrypt = require("bcrypt");
 const saltRounds = 10;
 const helmet = require("helmet");
 const jwt = require("jsonwebtoken");
-// app.use(helmet());
+app.use(helmet());
 
 const rateLimit = require("express-rate-limit");
 const limiter = rateLimit({
@@ -49,9 +49,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      // secure: true, // HTTPS-only
-      // httpOnly: true, // Prevent client-side JavaScript from accessing cookies
-      // sameSite: "strict", // Prevent CSRF
+      secure: true, // HTTPS-only
+      httpOnly: true, // Prevent client-side JavaScript from accessing cookies
+      sameSite: "strict", // Prevent CSRF
     },
   })
 );
@@ -60,12 +60,18 @@ app.use(express.json());
 app.use(passport.initialize());
 app.use(passport.session());
 
-app.use(cors(
-  {
-    origin: "http://localhost:5173",
-    credentials: true,
-  }
-));
+app.use(
+  cors(
+    {
+      origin: "hooperdooper.in",
+      credentials: true,
+    },
+    {
+      origin: "https://hooperdooper.in",
+      credentials: true,
+    }
+  )
+);
 
 app.use("/auth", require("./routes/auth.js"));
 
