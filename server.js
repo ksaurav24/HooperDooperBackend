@@ -63,11 +63,11 @@ app.use(passport.session());
 app.use(
   cors(
     {
-      origin: "hooperdooper.in",
+      origin: "https://hooperdooper.in",
       credentials: true,
     },
     {
-      origin: "https://hooperdooper.in",
+      origin: "https://www.hooperdooper.in",
       credentials: true,
     }
   )
@@ -102,10 +102,15 @@ app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
+    const newUser = User.findOne({ email }).select(
+      "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
+    );
+
     res.status(200).json({
       success: true,
       message: "Logged in",
       token: token,
+      user: newUser,
     });
   } catch (error) {
     res.status(400).json({
