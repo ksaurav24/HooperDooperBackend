@@ -535,34 +535,29 @@ app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
 });
 
 // Remove product from cart
-app.delete(
-  "/cart/remove/:productId",
-  verifyJwt,
-  isVerified,
-  async (req, res) => {
-    try {
-      const userId = req.user._id;
-      const productId = req.params.productId;
-      const user = await User.findById(userId);
-      const index = user.cart.indexOf(productId);
-      if (index > -1) {
-        user.cart.splice(index, 1);
-      }
-      await user.save();
-      res.status(200).json({
-        success: true,
-        message: "Product removed from cart",
-        data: user.cart,
-      });
-    } catch (error) {
-      res.status(400).json({
-        success: false,
-        message: "Failed to remove product from cart",
-      });
-      console.log(error);
+app.delete("/cart/:productId", verifyJwt, isVerified, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const productId = req.params.productId;
+    const user = await User.findById(userId);
+    const index = user.cart.indexOf(productId);
+    if (index > -1) {
+      user.cart.splice(index, 1);
     }
+    await user.save();
+    return res.status(200).json({
+      success: true,
+      message: "Product removed from cart",
+      data: user.cart,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({
+      success: false,
+      message: "Failed to remove product from cart",
+    });
   }
-);
+});
 
 // Add product to wishlist
 
