@@ -41,6 +41,7 @@ const OrderItem = require("./models/orderItem.model.js");
 const Ticket = require("./models/ticket.Model.js");
 const isVerified = require("./middlewares/isVerified.middleware.js");
 const verifyJwt = require("./middlewares/verifyJwt.js");
+const Product = require("./models/productModel.js");
 
 initializingPassport(passport);
 app.use(
@@ -61,16 +62,15 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use(
-  cors(
-    {
-      origin: "https://hooperdooper.in",
-      credentials: true,
-    },
-    {
-      origin: "https://www.hooperdooper.in",
-      credentials: true,
-    }
-  )
+  cors()
+  // {
+  //   origin: "https://hooperdooper.in",
+  //   credentials: true,
+  // },
+  // {
+  //   origin: "https://www.hooperdooper.in",
+  //   credentials: true,
+  // }
 );
 
 app.use("/auth", require("./routes/auth.js"));
@@ -447,44 +447,91 @@ app.get("/orders", verifyJwt, isVerified, async (req, res) => {
 // cart and wishlist routes
 
 // get cart of user
-app
-  .get("/cart", verifyJwt, isVerified, async (req, res) => {
+app.get("/cart", verifyJwt, isVerified, async (req, res) => {
+  try {
+    const userId = req.user?._id;
+    const user = await User.findById(userId).populate("cart");
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
     try {
-      const userId = req.user?._id;
+      const cartItems = user.cart.map(async (item) => {
+        const product = await Product.findById(item.product);
+        return {
+          id: product._id,
+          name: product.title,
+          price: product.price,
+          image: product.imageUrl,
+          color: product.color,
+          description: product.description,
+          quantity: item.quantity,
+        };
+      });
+      const cart = await Promise.all(cartItems);
+      return res.status(200).json({
+        success: true,
+        message: "Cart details found",
+        data: cart,
+      });
     } catch (error) {
       console.log(error);
-      res.status(500).json({
+      return res.status(500).json({
         message: "Some error occured while fetching cart details",
         success: false,
       });
     }
-  })
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({
+      message: "Some error occured while fetching cart details",
+      success: false,
+    });
+  }
+});
 
-  // Add product to cart
-  .app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
-    try {
-      const userId = req.user._id;
-      const orderItem = new OrderItem({
-        quantity: req.body.quantity,
-        product: req.body.product,
-      });
-      await orderItem.save();
-      const user = await User.findById(userId);
-      user.cart.push(orderItem._id);
-      await user.save();
-      res.status(200).json({
-        success: true,
-        message: "Product added to cart",
-        data: user.cart,
-      });
-    } catch (error) {
-      res.status(400).json({
+// Add product to cart
+app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const quantity = req.body.quantity;
+    const product = req.body.product;
+    if (!quantity || !product) {
+      return res.status(401).json({
+        message: "product and quantity is required",
         success: false,
-        message: "Failed to add product to cart",
       });
-      console.log(error);
     }
-  });
+    const productId = await Product.findOne({ slug: product });
+    if (!productId) {
+      return res.status(404).json({
+        message: "Product not found. Please check the product slug",
+        success: false,
+      });
+    }
+    const orderItem = new OrderItem({
+      quantity: quantity,
+      product: productId._id,
+    });
+    await orderItem.save();
+    const user = await User.findById(userId);
+    user.cart.push(orderItem._id);
+    await user.save();
+    res.status(200).json({
+      success: true,
+      message: "Product added to cart",
+      data: user.cart,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to add product to cart",
+    });
+    console.log(error);
+  }
+});
 
 // Remove product from cart
 app.delete(
