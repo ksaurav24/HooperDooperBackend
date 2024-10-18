@@ -19,7 +19,7 @@ const registrationMail = async (options) => {
 
   // Generate a verification key
   const verificationKey = uuidv4();
-  const verificationLink = `http://localhost:3000/auth/verify-email/${verificationKey}`;
+  const verificationLink = `https://api.hooperdooper.in/auth/verify-email/${verificationKey}`;
   // get the current date and add 1 hour to it
   const date = Date.now();
   const verificationKeyExpiry = date + 3600000;
