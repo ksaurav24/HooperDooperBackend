@@ -102,7 +102,7 @@ app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "1d",
     });
-    const newUser = User.findOne({ email }).select(
+    const newUser = await User.findOne({ email }).select(
       "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
     );
 
@@ -116,6 +116,7 @@ app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
     res.status(400).json({
       success: false,
       message: "Failed to login",
+      error: error,
     });
     console.log(error);
   }
@@ -445,31 +446,45 @@ app.get("/orders", verifyJwt, isVerified, async (req, res) => {
 
 // cart and wishlist routes
 
-// Add product to cart
-app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const orderItem = new OrderItem({
-      quantity: req.body.quantity,
-      product: req.body.product,
-    });
-    await orderItem.save();
-    const user = await User.findById(userId);
-    user.cart.push(orderItem._id);
-    await user.save();
-    res.status(200).json({
-      success: true,
-      message: "Product added to cart",
-      data: user.cart,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: "Failed to add product to cart",
-    });
-    console.log(error);
-  }
-});
+// get cart of user
+app
+  .get("/cart", verifyJwt, isVerified, async (req, res) => {
+    try {
+      const userId = req.user?._id;
+    } catch (error) {
+      console.log(error);
+      res.status(500).json({
+        message: "Some error occured while fetching cart details",
+        success: false,
+      });
+    }
+  })
+
+  // Add product to cart
+  .app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const orderItem = new OrderItem({
+        quantity: req.body.quantity,
+        product: req.body.product,
+      });
+      await orderItem.save();
+      const user = await User.findById(userId);
+      user.cart.push(orderItem._id);
+      await user.save();
+      res.status(200).json({
+        success: true,
+        message: "Product added to cart",
+        data: user.cart,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: "Failed to add product to cart",
+      });
+      console.log(error);
+    }
+  });
 
 // Remove product from cart
 app.delete(
