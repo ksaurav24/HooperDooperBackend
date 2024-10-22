@@ -1,6 +1,7 @@
 const expressSession = require("express-session");
 const express = require("express");
 const { v4: uuidv4 } = require("uuid");
+
 const cors = require("cors");
 const passport = require("passport");
 const app = express();
@@ -40,7 +41,6 @@ const Order = require("./models/ordersModel.js");
 const OrderItem = require("./models/orderItem.model.js");
 const Ticket = require("./models/ticket.Model.js");
 const isVerified = require("./middlewares/isVerified.middleware.js");
-const verifyJwt = require("./middlewares/verifyJwt.js");
 const Product = require("./models/productModel.js");
 
 initializingPassport(passport);
@@ -48,12 +48,7 @@ app.use(
   expressSession({
     secret: process.env.SESSION_SECRET,
     resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: true, // HTTPS-only
-      httpOnly: true, // Prevent client-side JavaScript from accessing cookies
-      sameSite: "strict", // Prevent CSRF
-    },
+    saveUninitialized: true,
   })
 );
 app.use(express.urlencoded({ extended: true }));
@@ -62,21 +57,22 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 app.use(
-  cors(
-    {
-      origin: "https://hooperdooper.in",
-      credentials: true,
-    },
-    {
-      origin: "https://www.hooperdooper.in",
-      credentials: true,
-    }
-  )
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  })
 );
 
 app.use("/auth", require("./routes/auth.js"));
 
 mongoose.connect(process.env.MONGO_URI);
+
+app.get("/auth/v1/isAuthenticated", isAuthenticated, async (req, res) => {
+  res.status(200).json({
+    message: "user is authenticated",
+    authenticated: true,
+  });
+});
 
 app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
   try {
@@ -122,6 +118,19 @@ app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
     console.log(error);
   }
 });
+
+app.post(
+  "/auth/v2/login",
+  loginInputValidation,
+  passport.authenticate("local"),
+  async (req, res) => {
+    res.status(200).json({
+      message: "Logged in",
+      success: true,
+      user: req.user._id,
+    });
+  }
+);
 
 app.get("/auth/v1/logout", (req, res) => {
   try {
@@ -194,6 +203,13 @@ app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
   }
 });
 
+app.get("/isAuthenticated", isAuthenticated, async (req, res) => {
+  return res.status(200).json({
+    message: "User is authenticated",
+    authenticated: true,
+  });
+});
+
 // Route for Email Verification
 app.get("/auth/verify-email/:verificationKey", async (req, res) => {
   const verificationKey = req.params.verificationKey;
@@ -240,13 +256,13 @@ app.get("/auth/verify-email/:verificationKey", async (req, res) => {
 });
 
 // profile route
-app.get("/profile", verifyJwt, async (req, res) => {
+app.get("/profile", isAuthenticated, async (req, res) => {
   try {
     const user = await User.findById(req.user._id).select(
       "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
     );
     if (!user) {
-      res.status(404).json({
+      return res.status(404).json({
         success: false,
         message: "User not found",
       });
@@ -265,7 +281,7 @@ app.get("/profile", verifyJwt, async (req, res) => {
   }
 });
 
-app.get("/isauthenticated", verifyJwt, (req, res) => {
+app.get("/isauthenticated", isAuthenticated, (req, res) => {
   if (req.user) {
     return res.status(200).json({
       authenticated: true,
@@ -282,7 +298,7 @@ app.get("/isauthenticated", verifyJwt, (req, res) => {
 // Order Routes
 app.post(
   "/order/new",
-  verifyJwt,
+  isAuthenticated,
   isVerified,
   validateOrderInput,
   async (req, res) => {
@@ -356,7 +372,7 @@ app.post(
 );
 
 // Delete order by orderId
-app.delete("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
+app.delete("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -394,7 +410,7 @@ app.delete("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
 
 // Get order by orderId
 
-app.get("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
+app.get("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -424,7 +440,7 @@ app.get("/order/:orderId", verifyJwt, isVerified, async (req, res) => {
 });
 
 // Get all orders
-app.get("/orders", verifyJwt, isVerified, async (req, res) => {
+app.get("/orders", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const orders = await Order.find({ userId: userId }).populate(
@@ -448,7 +464,7 @@ app.get("/orders", verifyJwt, isVerified, async (req, res) => {
 // cart and wishlist routes
 
 // get cart of user
-app.get("/cart", verifyJwt, isVerified, async (req, res) => {
+app.get("/cart", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user?._id;
     const user = await User.findById(userId).populate("cart");
@@ -494,7 +510,7 @@ app.get("/cart", verifyJwt, isVerified, async (req, res) => {
 });
 
 // Add product to cart
-app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
+app.post("/cart/add", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const quantity = req.body.quantity;
@@ -535,33 +551,38 @@ app.post("/cart/add", verifyJwt, isVerified, async (req, res) => {
 });
 
 // Remove product from cart
-app.delete("/cart/:productId", verifyJwt, isVerified, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const productId = req.params.productId;
-    const user = await User.findById(userId);
-    const index = user.cart.indexOf(productId);
-    if (index > -1) {
-      user.cart.splice(index, 1);
+app.delete(
+  "/cart/:productId",
+  isAuthenticated,
+  isVerified,
+  async (req, res) => {
+    try {
+      const userId = req.user._id;
+      const productId = req.params.productId;
+      const user = await User.findById(userId);
+      const index = user.cart.indexOf(productId);
+      if (index > -1) {
+        user.cart.splice(index, 1);
+      }
+      await user.save();
+      return res.status(200).json({
+        success: true,
+        message: "Product removed from cart",
+        data: user.cart,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: "Failed to remove product from cart",
+      });
     }
-    await user.save();
-    return res.status(200).json({
-      success: true,
-      message: "Product removed from cart",
-      data: user.cart,
-    });
-  } catch (error) {
-    console.log(error);
-    return res.status(400).json({
-      success: false,
-      message: "Failed to remove product from cart",
-    });
   }
-});
+);
 
 // Add product to wishlist
 
-app.post("/wishlist/add", verifyJwt, isVerified, async (req, res) => {
+app.post("/wishlist/add", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
     const productId = req.body.productId;
@@ -600,7 +621,7 @@ app.post("/wishlist/add", verifyJwt, isVerified, async (req, res) => {
 
 app.post(
   "/ticket/new",
-  verifyJwt,
+  isAuthenticated,
   isVerified,
   validateTicketInput,
   async (req, res) => {
@@ -634,7 +655,7 @@ app.post(
 // Admin Routes
 
 // update order status
-app.put("/admin/order/:orderId", verifyJwt, isAdmin, async (req, res) => {
+app.put("/admin/order/:orderId", isAuthenticated, isAdmin, async (req, res) => {
   try {
     const userId = req.user._id;
     const orderId = req.params.orderId;
@@ -671,7 +692,7 @@ app.put("/admin/order/:orderId", verifyJwt, isAdmin, async (req, res) => {
 });
 
 // Get all orders
-app.get("/admin/orders", verifyJwt, isAdmin, async (req, res) => {
+app.get("/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
   try {
     const orders = await Order.find();
     res.status(200).json({
@@ -689,7 +710,7 @@ app.get("/admin/orders", verifyJwt, isAdmin, async (req, res) => {
 });
 
 // Get all users
-app.get("/admin/users", verifyJwt, isAdmin, async (req, res) => {
+app.get("/admin/users", isAuthenticated, isAdmin, async (req, res) => {
   try {
     const users = await User.find().select(
       "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
@@ -709,7 +730,7 @@ app.get("/admin/users", verifyJwt, isAdmin, async (req, res) => {
 });
 
 // Get user by userId
-app.get("/admin/user/:userId", verifyJwt, isAdmin, async (req, res) => {
+app.get("/admin/user/:userId", isAuthenticated, isAdmin, async (req, res) => {
   try {
     const userId = req.params.userId;
     const user = await User.findById(userId).select(
@@ -737,7 +758,7 @@ app.get("/admin/user/:userId", verifyJwt, isAdmin, async (req, res) => {
 
 // get all tickets
 
-app.get("/admin/tickets", verifyJwt, isAdmin, async (req, res) => {
+app.get("/admin/tickets", isAuthenticated, isAdmin, async (req, res) => {
   try {
     const tickets = await Ticket.find();
     res.status(200).json({
@@ -756,57 +777,67 @@ app.get("/admin/tickets", verifyJwt, isAdmin, async (req, res) => {
 
 // get ticket by ticketId
 
-app.get("/admin/ticket/:ticketId", verifyJwt, isAdmin, async (req, res) => {
-  try {
-    const ticketId = req.params.ticketId;
-    const ticket = await Ticket.findById(ticketId);
-    if (!ticket) {
-      res.status(404).json({
-        success: false,
-        message: "Ticket not found",
+app.get(
+  "/admin/ticket/:ticketId",
+  isAuthenticated,
+  isAdmin,
+  async (req, res) => {
+    try {
+      const ticketId = req.params.ticketId;
+      const ticket = await Ticket.findById(ticketId);
+      if (!ticket) {
+        res.status(404).json({
+          success: false,
+          message: "Ticket not found",
+        });
+      }
+      res.status(200).json({
+        success: true,
+        message: "Ticket found",
+        data: ticket,
       });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: "Failed to get ticket",
+      });
+      console.log(error);
     }
-    res.status(200).json({
-      success: true,
-      message: "Ticket found",
-      data: ticket,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: "Failed to get ticket",
-    });
-    console.log(error);
   }
-});
+);
 
 // update ticket status
 
-app.put("/admin/ticket/:ticketId", verifyJwt, isAdmin, async (req, res) => {
-  try {
-    const ticketId = req.params.ticketId;
-    const ticket = await Ticket.findById(ticketId);
-    if (!ticket) {
-      res.status(404).json({
-        success: false,
-        message: "Ticket not found",
+app.put(
+  "/admin/ticket/:ticketId",
+  isAuthenticated,
+  isAdmin,
+  async (req, res) => {
+    try {
+      const ticketId = req.params.ticketId;
+      const ticket = await Ticket.findById(ticketId);
+      if (!ticket) {
+        res.status(404).json({
+          success: false,
+          message: "Ticket not found",
+        });
+      }
+      ticket.status = req.body.status;
+      await ticket.save();
+      res.status(200).json({
+        success: true,
+        message: "Ticket status updated successfully",
+        data: ticket,
       });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: "Failed to update ticket status",
+      });
+      console.log(error);
     }
-    ticket.status = req.body.status;
-    await ticket.save();
-    res.status(200).json({
-      success: true,
-      message: "Ticket status updated successfully",
-      data: ticket,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: "Failed to update ticket status",
-    });
-    console.log(error);
   }
-});
+);
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

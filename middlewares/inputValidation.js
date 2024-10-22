@@ -21,7 +21,7 @@ const registerInputValidation = (req, res, next) => {
 };
 
 const loginInputSchema = zod.object({
-  email: zod.string().email().min(6),
+  username: zod.string().min(6),
   password: zod.string().min(6),
 });
 
@@ -31,6 +31,7 @@ const loginInputValidation = (req, res, next) => {
     console.log(req.body);
     next();
   } catch (error) {
+    console.log(error);
     res.status(400).json({
       message: "Validation Error",
       error: error.errors,

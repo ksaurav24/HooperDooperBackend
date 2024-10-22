@@ -61,10 +61,6 @@ const userSchema = new mongoose.Schema(
       default: null,
     },
 
-    country: {
-      type: String,
-      default: "",
-    },
     fullName: {
       type: String,
       required: true,

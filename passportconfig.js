@@ -1,6 +1,6 @@
 const passport = require("passport");
 const LocalStrategy = require("passport-local").Strategy;
-const User = require("./models/userModel.js");
+const User = require("./models/userModel");
 const dotenv = require("dotenv");
 dotenv.config();
 
@@ -8,10 +8,8 @@ const bcrypt = require("bcrypt");
 exports.initializingPassport = async (passport) => {
   passport.use(
     new LocalStrategy(async function (username, password, done) {
-      console.log(username);
       const user = await User.findOne({ username });
       try {
-        console.log(user);
         if (!user) {
           return done(null, false, { message: "user not found" });
         }
@@ -27,33 +25,18 @@ exports.initializingPassport = async (passport) => {
       }
     })
   );
-
-  passport.serializeUser(function (user, done) {
-    done(null, user.id);
-  });
-  passport.deserializeUser(async function (id, done) {
-    try {
-      const user = await User.findById(id);
-      if (!user) {
-        return done(null, false);
-      }
-      done(null, user);
-    } catch (error) {
-      return done(error, false);
-    }
-  });
 };
 
 exports.isAuthenticated = (req, res, next) => {
-  console.log("user :" + req.user);
-  console.log(req.session);
-  if (req.user) {
-    return next();
+  console.log(req.user);
+  if (!req.user) {
+    return res.status(401).json({
+      authenticated: false,
+      message: "user not authenticated please login",
+    });
   }
-  res.status(401).json({
-    authenticated: false,
-    message: "user not authenticated apun ka error",
-  });
+  console.log("authenticated");
+  next();
 };
 
 var GoogleStrategy = require("passport-google-oauth20").Strategy;
@@ -71,7 +54,7 @@ passport.use(
         if (user) {
           return cb(null, user);
         } else {
-          const newUser = await User.create({
+          const user = await new User({
             googleId: profile.id,
             name: profile.displayName,
             profilePicture: profile._json.picture,
@@ -80,6 +63,7 @@ passport.use(
               5
             )}`,
           });
+          const newUser = await user.save();
           return cb(null, newUser);
         }
       } catch (error) {
@@ -88,3 +72,18 @@ passport.use(
     }
   )
 );
+
+passport.serializeUser(function (user, done) {
+  done(null, user._id);
+});
+passport.deserializeUser(async function (id, done) {
+  try {
+    const user = await User.findById(id);
+    if (!user) {
+      return done(null, false);
+    }
+    done(null, user);
+  } catch (error) {
+    return done(error, false);
+  }
+});
