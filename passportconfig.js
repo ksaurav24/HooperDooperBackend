@@ -5,7 +5,6 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const bcrypt = require("bcrypt");
-const isVerified = require("./middlewares/isVerified.middleware");
 exports.initializingPassport = async (passport) => {
   passport.use(
     new LocalStrategy(async function (username, password, done) {
