@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 const dotenv = require("dotenv");
 dotenv.config();
 
-const CLIENT_URL = "http://localhost:5173/";
+const CLIENT_URL = "https://hooperdooper.in";
 
 router.get("/login/failed", (req, res) => {
   res.status(401).json({
