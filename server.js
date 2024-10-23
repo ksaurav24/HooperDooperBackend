@@ -42,6 +42,7 @@ const OrderItem = require("./models/orderItem.model.js");
 const Ticket = require("./models/ticket.Model.js");
 const isVerified = require("./middlewares/isVerified.middleware.js");
 const Product = require("./models/productModel.js");
+const resetPasswordMail = require("./controllers/forgotPassword.mailer.js");
 
 initializingPassport(passport);
 app.use(
@@ -189,12 +190,29 @@ app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
     });
 
     await user.save();
+
     res.status(201).json({
       success: true,
-      message: "User created",
-      user: user._id,
+      message: "User registered successfully",
     });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      message: "Internal server error",
+      success: false,
+    });
+  }
+});
 
+app.get("/auth/send-verification-email", isAuthenticated, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
     // nodemailer Area
     const registrationMail = require("./controllers/registrationmail");
     console.log("Sending mail to user");
@@ -211,13 +229,6 @@ app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
       success: false,
     });
   }
-});
-
-app.get("/isAuthenticated", isAuthenticated, async (req, res) => {
-  return res.status(200).json({
-    message: "User is authenticated",
-    authenticated: true,
-  });
 });
 
 // Route for Email Verification
@@ -265,6 +276,136 @@ app.get("/auth/verify-email/:verificationKey", async (req, res) => {
   }
 });
 
+// Route for forgot password
+app.post("/auth/forgot-password", async (req, res) => {
+  const email = req?.body?.email;
+  if (!email) {
+    return res.status(400).json({
+      success: false,
+      message: "Email is required",
+    });
+  }
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    const resetPasswordToken = jwt.sign(
+      { id: user._id },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: "15m",
+      }
+    );
+    await User.findByIdAndUpdate(user._id, {
+      resetPasswordToken: resetPasswordToken,
+      // 15 minutes expiry
+      resetPasswordExpiry: Date.now() + 900000,
+    });
+    // nodemailer area
+    await resetPasswordMail({
+      to: user.email,
+      text: `Hello ${user.name}, you have requested to reset your password. Click on the link below to reset your password. If you didn't request this, please ignore this email`,
+      resetToken: resetPasswordToken,
+    });
+
+    // nodemailer area ends
+
+    return res.status(200).json({
+      success: true,
+      message: "Reset password link sent to your email",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({
+      success: false,
+      message: "Failed to reset password",
+    });
+  }
+});
+
+// Route for reset password
+app.post("/auth/reset-password", async (req, res) => {
+  const { resetToken, password } = req.body;
+  try {
+    const user = await User.findOne({ resetPasswordToken: resetToken });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Invalid token",
+      });
+    }
+    const date = Date.now();
+    const resetPasswordExpiry = user.resetPasswordExpiry;
+    if (date >= resetPasswordExpiry) {
+      return res.status(400).json({
+        success: false,
+        message: "Token expired",
+      });
+    }
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    await User.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpiry: null,
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({
+      success: false,
+      message: "Failed to reset password",
+    });
+  }
+});
+
+// Route for password change
+
+app.post("/auth/change-password", isAuthenticated, async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    if (!user.password) {
+      return res.status(400).json({
+        success: false,
+        message: "Google users cannot change password",
+      });
+    }
+    if (!(await bcrypt.compare(oldPassword, user.password))) {
+      return res.status(400).json({
+        success: false,
+        message: "Incorrect password",
+      });
+    }
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+    await User.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+    });
+    return res.status(200).json({
+      success: true,
+      message: "Password changed successfully",
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(400).json({
+      success: false,
+      message: "Failed to change password",
+    });
+  }
+});
+
 // profile route
 app.get("/profile", isAuthenticated, async (req, res) => {
   try {
@@ -292,16 +433,9 @@ app.get("/profile", isAuthenticated, async (req, res) => {
 });
 
 app.get("/isauthenticated", isAuthenticated, (req, res) => {
-  if (req.user) {
-    return res.status(200).json({
-      authenticated: true,
-      message: "user authenticated",
-    });
-  }
-  // if user is not authenticated
-  res.status(400).json({
-    authenticated: false,
-    message: "user not authenticated",
+  return res.status(200).json({
+    authenticated: true,
+    message: "user authenticated",
   });
 });
 

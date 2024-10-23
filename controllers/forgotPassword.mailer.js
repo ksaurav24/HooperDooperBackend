@@ -1,11 +1,9 @@
 // Import the Nodemailer library
 const nodemailer = require("nodemailer");
-const { v4: uuidv4 } = require("uuid");
-const User = require("../models/userModel.js");
 // const { options } = require("../routes/auth");
 
 // console.log`enterd in nodemailer`;
-const registrationMail = async (options) => {
+const resetPasswordMail = async (options) => {
   // Create a transporter object
   const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -16,30 +14,12 @@ const registrationMail = async (options) => {
       pass: "abqj szms pnfo qucs",
     },
   });
-
-  // Generate a verification key
-  const verificationKey = uuidv4();
-  const verificationLink = `https://api.hooperdooper.in/auth/verify-email/${verificationKey}`;
-  // get the current date and add 1 hour to it
-  const date = Date.now();
-  const verificationKeyExpiry = date + 3600000;
-  // Update the user with the verification key and expiry
-  try {
-    await User.findByIdAndUpdate(options.userId, {
-      verificationKey,
-      verificationKeyExpiry,
-    });
-  } catch (error) {
-    console.log(error);
-  }
-  // Configure the mailoptions object
-  //   console.log`object created`;
-  //   console.log`options: ${options}`;
+  const passwordResetLink = `https://hooperdooper.in/reset-password/${options.resetToken}`;
   const mailOptions = {
     from: "HooperDooper@gmail.com",
     to: options.to, // list of receivers
     //   we can simply use array for multiple users
-    subject: "Welcome to Hooper Dooper! Verify your email",
+    subject: "Password Reset - Hooper Dooper",
     text: options.text,
     html: `<!DOCTYPE html>
 <html lang="en">
@@ -98,13 +78,16 @@ const registrationMail = async (options) => {
     <div class="content">
         <p>Hi there,</p>
 
-        <p>Thank you for registering with Hooper Dooper! Please verify your email address by clicking the button below. The verification link will expire in 15 minutes, so be sure to confirm your email promptly.</p>
+        <p>
+            You are receiving this email because you requested a password reset for your Hooper Dooper account.
+
+        </p>
 
         <div class="button-container">
-            <a href="${verificationLink}" class="verify-button">Click Here to Verify Your Email</a>
+            <a href="${passwordResetLink}" class="verify-button">Click Here to change password</a>
         </div>
 
-        <p>If you did not sign up for this account, you can safely ignore this email.</p>
+        <p>If you did not request for password change, you can safely ignore this email.</p>
 
         <p>Best regards,<br>The Hooper Dooper Team</p>
 
@@ -120,7 +103,7 @@ const registrationMail = async (options) => {
   const info = await transporter.sendMail(mailOptions);
   transporter.close();
 
-  console.log("Message sent: %s", info.messageId);
+  console.log("password change email sent: %s", info.messageId);
   // Message sent: <d786aa62-4e0a-070a-47ed-0b0666549519@ethereal.email>
 };
 
@@ -131,4 +114,4 @@ const registrationMail = async (options) => {
 // //   console.log("Something lafda in registrationMail.js");
 // }
 
-module.exports = registrationMail;
+module.exports = resetPasswordMail;
