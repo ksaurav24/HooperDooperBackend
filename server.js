@@ -344,6 +344,8 @@ app.post("/auth/reset-password", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Token expired",
+        resetPasswordExpiry: resetPasswordExpiry,
+        date: date,
       });
     }
     const hashedPassword = await bcrypt.hash(password, saltRounds);
