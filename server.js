@@ -329,6 +329,7 @@ app.post("/auth/forgot-password", async (req, res) => {
 
 // Route for reset password
 app.post("/auth/reset-password", async (req, res) => {
+  console.log(req.body);
   const { resetToken, password } = req.body;
   if (!resetToken || !password) {
     return res.status(400).json({
