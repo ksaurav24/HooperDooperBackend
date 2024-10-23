@@ -300,11 +300,9 @@ app.post("/auth/forgot-password", async (req, res) => {
         expiresIn: "15m",
       }
     );
-    const date = Date.now();
+
     await User.findByIdAndUpdate(user._id, {
       resetPasswordToken: resetPasswordToken,
-      // 15 minutes expiry
-      resetPasswordExpiry: date + 900000,
     });
 
     // nodemailer area
@@ -332,29 +330,25 @@ app.post("/auth/forgot-password", async (req, res) => {
 // Route for reset password
 app.post("/auth/reset-password", async (req, res) => {
   const { resetToken, password } = req.body;
+  if (!resetToken || !password) {
+    return res.status(400).json({
+      success: false,
+      message: "Reset token and password is required",
+    });
+  }
   try {
-    const user = await User.findOne({ resetPasswordToken: resetToken });
+    const userId = jwt.verify(resetToken, process.env.JWT_SECRET).id;
+    const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({
         success: false,
-        message: "Invalid token",
-      });
-    }
-    const date = Date.now();
-    const resetPasswordExpiry = user.resetPasswordExpiry;
-    if (date >= resetPasswordExpiry) {
-      return res.status(400).json({
-        success: false,
-        message: "Token expired",
-        resetPasswordExpiry: resetPasswordExpiry,
-        date: date,
+        message: "Invalid reset token",
       });
     }
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     await User.findByIdAndUpdate(user._id, {
       password: hashedPassword,
       resetPasswordToken: null,
-      resetPasswordExpiry: null,
     });
     return res.status(200).json({
       success: true,

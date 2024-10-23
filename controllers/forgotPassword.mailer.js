@@ -52,10 +52,11 @@ const resetPasswordMail = async (options) => {
         .button-container {
             text-align: center;
             margin: 20px 0;
+
         }
         .verify-button {
             background-color: #0A4ADC;
-            color: white;
+            color: #fff;
             padding: 10px 20px;
             text-decoration: none;
             font-size: 18px;
@@ -63,6 +64,7 @@ const resetPasswordMail = async (options) => {
         }
         .verify-button:hover {
             background-color: #08389C;
+            color: #fafafa;
         }
         .footer {
             font-size: 12px;
@@ -73,7 +75,7 @@ const resetPasswordMail = async (options) => {
 </head>
 <body>
     <div class="header">
-        <h1>Verify Your Email</h1>
+        <h1>Reset your password</h1>
     </div>
     <div class="content">
         <p>Hi there,</p>

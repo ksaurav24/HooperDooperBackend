@@ -75,13 +75,14 @@ const registrationMail = async (options) => {
         }
         .verify-button {
             background-color: #0A4ADC;
-            color: white;
+            color: #fff;
             padding: 10px 20px;
             text-decoration: none;
             font-size: 18px;
             border-radius: 5px;
         }
         .verify-button:hover {
+            color: #fafafa;
             background-color: #08389C;
         }
         .footer {
