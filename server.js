@@ -300,11 +300,13 @@ app.post("/auth/forgot-password", async (req, res) => {
         expiresIn: "15m",
       }
     );
+    const date = Date.now();
     await User.findByIdAndUpdate(user._id, {
       resetPasswordToken: resetPasswordToken,
       // 15 minutes expiry
-      resetPasswordExpiry: Date.now() + 900000,
+      resetPasswordExpiry: date + 900000,
     });
+
     // nodemailer area
     await resetPasswordMail({
       to: user.email,
