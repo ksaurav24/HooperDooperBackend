@@ -11,6 +11,7 @@ const saltRounds = 10;
 const helmet = require("helmet");
 const jwt = require("jsonwebtoken");
 app.use(helmet());
+const mongooseAggregatorPaginate = require("mongoose-aggregate-paginate-v2");
 
 const rateLimit = require("express-rate-limit");
 const limiter = rateLimit({
@@ -18,7 +19,7 @@ const limiter = rateLimit({
   max: 100,
 });
 
-app.use(limiter);
+// app.use(limiter);
 
 const {
   validateTicketInput,
@@ -43,6 +44,9 @@ const Ticket = require("./models/ticket.Model.js");
 const isVerified = require("./middlewares/isVerified.middleware.js");
 const Product = require("./models/productModel.js");
 const resetPasswordMail = require("./controllers/forgotPassword.mailer.js");
+const passwordInputValidation = require("./middlewares/passwordInputValidation.js");
+const updateOrderInputValidation = require("./middlewares/updateOrderInputValidation.js");
+const productInputValidation = require("./middlewares/productInputValidatotion.js");
 
 initializingPassport(passport);
 app.use(
@@ -59,10 +63,10 @@ app.use(passport.session());
 
 app.use(
   cors(
-    // {
-    //   origin: "http://localhost:5173",
-    //   credentials: true,
-    // },
+    {
+      origin: "http://localhost:5173",
+      credentials: true,
+    },
     {
       origin: "https://hooperdooper.in",
       credentials: true,
@@ -85,50 +89,50 @@ app.get("/auth/v1/isAuthenticated", isAuthenticated, async (req, res) => {
   });
 });
 
-app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-    if (!user.password) {
-      return res.status(400).json({
-        success: false,
-        message: "Please login with google",
-      });
-    }
-    if (!(await bcrypt.compare(password, user.password))) {
-      return res.status(400).json({
-        success: false,
-        message: "Incorrect password",
-      });
-    }
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
-      expiresIn: "1d",
-    });
-    const newUser = await User.findOne({ email }).select(
-      "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
-    );
+// app.post("/auth/v1/login", loginInputValidation, async (req, res) => {
+//   try {
+//     const { email, password } = req.body;
+//     const user = await User.findOne({ email });
+//     if (!user) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "User not found",
+//       });
+//     }
+//     if (!user.password) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Please login with google",
+//       });
+//     }
+//     if (!(await bcrypt.compare(password, user.password))) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Incorrect password",
+//       });
+//     }
+//     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
+//       expiresIn: "1d",
+//     });
+//     const newUser = await User.findOne({ email }).select(
+//       "-password -verificationKey -verificationKeyExpiry -resetPasswordToken -resetPasswordExpiry"
+//     );
 
-    res.status(200).json({
-      success: true,
-      message: "Logged in",
-      token: token,
-      user: newUser,
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: "Failed to login",
-      error: error,
-    });
-    console.log(error);
-  }
-});
+//     res.status(200).json({
+//       success: true,
+//       message: "Logged in",
+//       token: token,
+//       user: newUser,
+//     });
+//   } catch (error) {
+//     res.status(400).json({
+//       success: false,
+//       message: "Failed to login",
+//       error: error,
+//     });
+//     console.log(error);
+//   }
+// });
 
 app.post(
   "/auth/v2/login",
@@ -180,6 +184,13 @@ app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
         message: "Failed to check username or email",
       });
       console.log(error);
+    }
+    if (!passwordInputValidation(password)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be atleast 6 characters long with atleast one uppercase, one lowercase, one number",
+      });
     }
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const user = new User({
@@ -337,6 +348,14 @@ app.post("/auth/reset-password", async (req, res) => {
       message: "Reset token and password is required",
     });
   }
+  if (!passwordInputValidation(password)) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Password must be atleast 6 characters long with atleast one uppercase, one lowercase, one number",
+    });
+  }
+
   try {
     const userId = jwt.verify(resetToken, process.env.JWT_SECRET).id;
     const user = await User.findById(userId);
@@ -386,6 +405,13 @@ app.post("/auth/change-password", isAuthenticated, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Incorrect password",
+      });
+    }
+    if (!passwordInputValidation(newPassword)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Password must be atleast 6 characters long with atleast one uppercase, one lowercase, one number",
       });
     }
     const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
@@ -481,16 +507,16 @@ app.post(
       let order = new Order({
         orderId: orderId,
         orderItems: orderItemsIdsResolved,
-        shippingAddress1: req.body.shippingAddress1,
-        shippingAddress2: req.body.shippingAddress2,
+        shippingAddress: req.body.shippingAddress,
         city: req.body.city,
         zip: req.body.zip,
         country: req.body.country,
         phone: req.body.phone,
         totalPrice: totalPrice,
-        user: req.body.user,
+        user: req.user._id,
         paymentMethod: paymentMethod,
         transactionId: transactionId,
+        fullName: req.user.fullName,
       });
       order = await order.save();
 
@@ -769,15 +795,14 @@ app.post(
   validateTicketInput,
   async (req, res) => {
     try {
-      const { title, description, category, priority } = req.body;
+      const { title, description, category } = req.body;
       const user = req.user._id;
       const ticket = new Ticket({
         ticketId: uuidv4(),
         title,
         description,
         category,
-        priority,
-        user,
+        user: user,
       });
       await ticket.save();
       res.status(201).json({
@@ -797,42 +822,108 @@ app.post(
 
 // Admin Routes
 
-// update order status
-app.put("/admin/order/:orderId", isAuthenticated, isAdmin, async (req, res) => {
-  try {
-    const userId = req.user._id;
-    const orderId = req.params.orderId;
-    const order = await Order.findOne({
-      userId: userId,
-      orderId: orderId,
-    });
-    if (!order) {
-      res.status(404).json({
-        success: false,
-        message: "Order not found",
-      });
-    }
-    if (order.status == "cancelled") {
-      res.status(400).json({
-        success: false,
-        message: "Order cannot be updated",
-      });
-    }
-    order.status = req.body.status;
-    await order.save();
+// admin login Route
+
+app.get("/admin/login", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Admin login page",
+  });
+});
+
+app.post(
+  "/admin/login",
+  passport.authenticate("local"),
+  isAdmin,
+  async (req, res) => {
     res.status(200).json({
       success: true,
-      message: "Order status updated successfully",
-      data: order,
+      message: "Logged in",
+      user: req.user._id,
+    });
+  }
+);
+
+// is-admin route
+app.get("/admin/is-admin", isAuthenticated, isAdmin, (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "User is admin",
+    isAdmin: true,
+  });
+});
+
+// analytics route
+app.get("/admin/analytics", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const [orderCount, userCount, ticketCount, productCount] =
+      await Promise.all([
+        Order.aggregate([{ $count: "count" }]),
+        User.aggregate([{ $count: "count" }]),
+        Ticket.aggregate([{ $count: "count" }]),
+        Product.aggregate([{ $count: "count" }]),
+      ]);
+
+    res.status(200).json({
+      success: true,
+      message: "Analytics found",
+      data: {
+        orders: orderCount[0]?.count || 0,
+        users: userCount[0]?.count || 0,
+        tickets: ticketCount[0]?.count || 0,
+        products: productCount[0]?.count || 0,
+      },
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: "Failed to update order status",
-    });
     console.log(error);
+    return res.status(400).json({
+      success: false,
+      message: "Failed to get analytics",
+    });
   }
 });
+
+// update order status
+app.put(
+  "/admin/order/:orderId",
+  isAuthenticated,
+  isAdmin,
+  updateOrderInputValidation,
+  async (req, res) => {
+    try {
+      const orderId = req.params.orderId;
+      const order = await Order.findOne({
+        orderId: orderId,
+      });
+      if (!order) {
+        return res.status(404).json({
+          success: false,
+          message: "Order not found",
+        });
+      }
+      if (order.status == "cancelled") {
+        return res.status(400).json({
+          success: false,
+          message: "Order cannot be updated",
+        });
+      }
+
+      order.status = req.body.status;
+      await order.save();
+      res.status(200).json({
+        success: true,
+        message: "Order status updated successfully",
+        data: order,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(400).json({
+        success: false,
+        message: "Failed to update order status",
+      });
+    }
+  }
+);
 
 // Get all orders
 app.get("/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
@@ -849,6 +940,36 @@ app.get("/admin/orders", isAuthenticated, isAdmin, async (req, res) => {
       message: "Failed to get orders",
     });
     console.log(error);
+  }
+});
+
+// Get orders of specific user
+app.post("/admin/user/orders", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "No user Id provided",
+      });
+    }
+
+    const orders = await Order.aggregate([
+      {
+        $match: {
+          user: userId,
+        },
+      },
+    ]);
+    res.status(200).json({
+      orders,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
   }
 });
 
@@ -976,6 +1097,64 @@ app.put(
       res.status(400).json({
         success: false,
         message: "Failed to update ticket status",
+      });
+      console.log(error);
+    }
+  }
+);
+
+// get all products
+app.get("/admin/products", isAuthenticated, isAdmin, async (req, res) => {
+  try {
+    const products = await Product.find();
+    res.status(200).json({
+      success: true,
+      message: "Products found",
+      data: products,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: "Failed to get products",
+    });
+    console.log(error);
+  }
+});
+
+// update product by productId
+
+app.put(
+  "/admin/product/:productSlug",
+  isAuthenticated,
+  isAdmin,
+  productInputValidation,
+  async (req, res) => {
+    try {
+      const productSlug = req.params.productSlug;
+      const product = await Product.findOne(
+        { slug: productSlug },
+        "-createdAt -updatedAt -__v "
+      );
+      if (!product) {
+        res.status(404).json({
+          success: false,
+          message: "Product not found",
+        });
+      }
+      product.title = req.product.title;
+      product.color = req.product.color;
+      product.description = req.product.description;
+      product.price = req.product.price;
+      await product.save();
+      res.status(200).json({
+        success: true,
+        message: "Product updated successfully",
+        data: product,
+      });
+    } catch (error) {
+      res.status(400).json({
+        success: false,
+        message: "Failed to update product",
       });
       console.log(error);
     }

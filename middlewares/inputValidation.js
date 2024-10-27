@@ -48,8 +48,7 @@ const orderValidationSchema = zod.object({
       })
     )
     .min(1, "Order must have at least one item"),
-  shippingAddress1: zod.string().nonempty("Shipping address is required"),
-  shippingAddress2: zod.string().optional(),
+  shippingAddress: zod.string().nonempty("Shipping address is required"),
   city: zod.string().nonempty("City is required"),
   zip: zod.string().nonempty("Zip code is required"),
   country: zod.string().nonempty("Country is required"),
@@ -57,7 +56,6 @@ const orderValidationSchema = zod.object({
     .string()
     .min(10, "Phone number must be at least 10 digits")
     .max(15, "Phone number can't exceed 15 digits"),
-  user: zod.string().nonempty("User ID is required"),
 });
 
 const validateOrderInput = (req, res, next) => {
@@ -74,10 +72,9 @@ const validateOrderInput = (req, res, next) => {
 };
 
 const ticketValidationSchema = zod.object({
-  title: zod.string().nonempty("Title is required"),
-  description: zod.string().nonempty("Description is required"),
-  priority: zod.string().nonempty("Priority is required"),
-  category: zod.string().nonempty("Category is required"),
+  title: zod.string().min(1),
+  description: zod.string().min(1),
+  category: zod.enum(["General", "Complaint", "Order", "Return", "Refund"]),
 });
 
 const validateTicketInput = (req, res, next) => {

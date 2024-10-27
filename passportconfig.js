@@ -28,14 +28,14 @@ exports.initializingPassport = async (passport) => {
 };
 
 exports.isAuthenticated = (req, res, next) => {
-  console.log(req.user);
+  // console.log(req.user);
   if (!req.user) {
     return res.status(401).json({
       authenticated: false,
       message: "user not authenticated please login",
     });
   }
-  console.log("authenticated");
+  // console.log("authenticated");
   next();
 };
 
@@ -46,22 +46,20 @@ passport.use(
     {
       clientID: process.env.CLIENT_ID,
       clientSecret: process.env.CLIENT_SECRET,
-      callbackURL: "https://api.hooperdooper.in/auth/google/callback",
+      callbackURL: "/auth/google/callback",
     },
-    async function (accessToken, refreshToken, profile, cb) {
+    async function (accessToken, refreshToken, profile, email, cb) {
       try {
         const user = await User.findOne({ googleId: profile.id });
         if (user) {
           return cb(null, user);
         } else {
           const user = await new User({
-            googleId: profile.id,
-            name: profile.displayName,
-            profilePicture: profile._json.picture,
-            username: `${profile.name.givenName.toLowerCase()}${profile.id.slice(
-              0,
-              5
-            )}`,
+            googleId: email.id,
+            email: email.emails[0].value,
+            fullName: email.displayName,
+            profilePicture: email._json.picture,
+            username: email.emails[0].value.split("@")[0],
             isVerified: true,
           });
           const newUser = await user.save();

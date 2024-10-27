@@ -1,10 +1,10 @@
 const mongoose = require("mongoose");
 
 const ticketSchema = mongoose.Schema({
-    ticketId: {
-        type: String,
-        required: true,
-    },
+  ticketId: {
+    type: String,
+    required: true,
+  },
   title: {
     type: String,
     required: true,
@@ -22,11 +22,6 @@ const ticketSchema = mongoose.Schema({
     type: String,
     required: true,
     default: "General",
-  },
-  priority: {
-    type: String,
-    required: true,
-    default: "Low",
   },
   user: {
     type: mongoose.Schema.Types.ObjectId,
