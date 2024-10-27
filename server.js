@@ -63,10 +63,10 @@ app.use(passport.session());
 
 app.use(
   cors(
-    {
-      origin: "http://localhost:5173",
-      credentials: true,
-    },
+    // {
+    //   origin: "http://localhost:5173",
+    //   credentials: true,
+    // },
     {
       origin: "https://hooperdooper.in",
       credentials: true,
