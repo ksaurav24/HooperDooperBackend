@@ -56,6 +56,10 @@ app.use(
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: true,
+    cookie: {
+      secure: true,
+      // sameSite: "strict",
+    },
   })
 );
 app.use(express.urlencoded({ extended: true }));
@@ -65,10 +69,10 @@ app.use(passport.session());
 
 app.use(
   cors(
-    {
-      origin: "http://localhost:5173",
-      credentials: true,
-    },
+    // {
+    //   origin: "http://localhost:5173",
+    //   credentials: true,
+    // },
     {
       origin: "https://admin.hooperdooper.in",
       credentials: true,
