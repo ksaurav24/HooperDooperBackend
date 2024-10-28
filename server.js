@@ -68,6 +68,10 @@ app.use(
     //   credentials: true,
     // },
     {
+      origin: "https://admin.hooperdooper.in",
+      credentials: true,
+    },
+    {
       origin: "https://hooperdooper.in",
       credentials: true,
     },
