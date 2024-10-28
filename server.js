@@ -911,9 +911,11 @@ app.put(
           message: "Order cannot be updated",
         });
       }
-
+      console.log(req.body);
       order.status = req.body.status;
-      await order.save();
+      const newOrder = await order.save();
+      console.log(newOrder);
+
       res.status(200).json({
         success: true,
         message: "Order status updated successfully",
