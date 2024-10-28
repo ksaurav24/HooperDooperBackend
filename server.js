@@ -47,6 +47,8 @@ const resetPasswordMail = require("./controllers/forgotPassword.mailer.js");
 const passwordInputValidation = require("./middlewares/passwordInputValidation.js");
 const updateOrderInputValidation = require("./middlewares/updateOrderInputValidation.js");
 const productInputValidation = require("./middlewares/productInputValidatotion.js");
+const sendMailInputValidation = require("./middlewares/sendMailInputValidation.js");
+const sendMail = require("./controllers/sendMail.js");
 
 initializingPassport(passport);
 app.use(
@@ -63,10 +65,10 @@ app.use(passport.session());
 
 app.use(
   cors(
-    // {
-    //   origin: "http://localhost:5173",
-    //   credentials: true,
-    // },
+    {
+      origin: "http://localhost:5173",
+      credentials: true,
+    },
     {
       origin: "https://admin.hooperdooper.in",
       credentials: true,
@@ -1163,6 +1165,43 @@ app.put(
         message: "Failed to update product",
       });
       console.log(error);
+    }
+  }
+);
+
+// send email to user
+app.post(
+  "/admin/send-email",
+  isAuthenticated,
+  sendMailInputValidation,
+  isAdmin,
+  async (req, res) => {
+    try {
+      const { email, subject, message } = req.body;
+      if (!email || !subject || !message) {
+        return res.status(400).json({
+          success: false,
+          message: "Email, subject and message is required",
+        });
+      }
+      // nodemailer area
+      await sendMail({
+        to: email,
+        text: "email from hooper dooper",
+        subject: subject,
+        message: message,
+      });
+      // nodemailer area ends
+      res.status(200).json({
+        success: true,
+        message: "Email sent successfully",
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to send email",
+      });
     }
   }
 );
