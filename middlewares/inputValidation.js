@@ -74,7 +74,15 @@ const validateOrderInput = (req, res, next) => {
 const ticketValidationSchema = zod.object({
   title: zod.string().min(1),
   description: zod.string().min(1),
-  category: zod.enum(["General", "Complaint", "Order", "Return", "Refund"]),
+  category: zod.enum([
+    "general",
+    "complaint",
+    "order",
+    "return",
+    "refund",
+    "payment",
+    "product",
+  ]),
 });
 
 const validateTicketInput = (req, res, next) => {
