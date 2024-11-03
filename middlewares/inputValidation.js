@@ -5,6 +5,10 @@ const registerInputSchema = zod.object({
   email: zod.string().email(),
   password: zod.string().min(6),
   fullName: zod.string().min(3),
+  phone: zod
+    .string()
+    .min(10, "Phone number must be at least 10 digits")
+    .max(15, "Phone number can't exceed 15 digits"),
 });
 
 const registerInputValidation = (req, res, next) => {
