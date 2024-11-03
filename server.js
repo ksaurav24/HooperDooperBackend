@@ -74,6 +74,7 @@ app.use(
         "https://admin.hooperdooper.in",
         "https://hooperdooper.in",
         "https://www.hooperdooper.in",
+        "http://localhost:5173",
       ],
       credentials: true,
     }
@@ -527,6 +528,9 @@ app.post(
           success: false,
           message: "Failed to create new order",
         });
+      const user = await User.findById(req.user._id);
+      user.cart = [];
+      await user.save();
       res.status(200).json({
         success: true,
         message: "Order created successfully",
@@ -614,21 +618,47 @@ app.get("/order/:orderId", isAuthenticated, isVerified, async (req, res) => {
 app.get("/orders", isAuthenticated, isVerified, async (req, res) => {
   try {
     const userId = req.user._id;
-    const orders = await Order.find({ userId: userId }).populate(
-      "orderItems",
-      "product"
-    );
+    const ordersWithDetails = await Order.aggregate([
+      {
+        $match: { user: userId },
+      },
+      {
+        $lookup: {
+          from: "orderitems",
+          localField: "orderItems",
+          foreignField: "_id",
+          as: "orderItems",
+          pipeline: [
+            {
+              $lookup: {
+                from: "products",
+                localField: "product",
+                foreignField: "_id",
+                as: "products",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    if (!ordersWithDetails) {
+      res.status(404).json({
+        success: false,
+        message: "Orders not found",
+      });
+    }
     res.status(200).json({
       success: true,
       message: "Orders found",
-      data: orders,
+      data: ordersWithDetails,
     });
   } catch (error) {
+    console.log(error);
     res.status(400).json({
       success: false,
       message: "Failed to get orders",
     });
-    console.log(error);
   }
 });
 
@@ -1180,6 +1210,7 @@ app.post(
           message: "Email, subject and message is required",
         });
       }
+      console.log(email, subject, message);
       // nodemailer area
       await sendMail({
         to: email,
