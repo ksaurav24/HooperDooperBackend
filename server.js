@@ -169,22 +169,25 @@ app.get("/auth/v1/logout", (req, res) => {
 
 app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
   try {
-    const { fullName, password, email } = req.body;
+    const { fullName, password, email, phone } = req.body;
     const username = email.split("@")[0];
     console.log(username);
     try {
       const emailExists = await User.findOne({ email });
+      const phoneExits = await User.findOne({
+        contact: phone,
+      });
 
-      if (emailExists) {
+      if (emailExists || phoneExits) {
         return res.status(400).json({
           success: false,
-          message: "Username or email already exists",
+          message: "Phone or email already exists",
         });
       }
     } catch (error) {
       res.status(400).json({
         success: false,
-        message: "Failed to check username or email",
+        message: "Failed to check Phone or email",
       });
       console.log(error);
     }
@@ -201,6 +204,7 @@ app.post("/auth/v1/register", registerInputValidation, async (req, res) => {
       password: hashedPassword,
       username: username.toLowerCase(),
       email: email.toLowerCase(),
+      contact: phone,
     });
 
     await user.save();
@@ -236,6 +240,11 @@ app.get("/auth/send-verification-email", isAuthenticated, async (req, res) => {
       userId: user._id,
     });
     // nodemailer Area ends
+    return res.status(200).json({
+      success: true,
+      message: "Verification email sent",
+    });
+
   } catch (error) {
     console.log(error);
     return res.status(500).json({
