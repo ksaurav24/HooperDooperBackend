@@ -771,9 +771,11 @@ app.delete(
       const productId = req.params.productId;
       const user = await User.findById(userId);
       const index = user.cart.indexOf(productId);
+      console.log(user.cart)
       if (index > -1) {
-        user.cart.splice(index, 1);
+        user.cart.splice(index, index);
       }
+      console.log(user.cart)
       await user.save();
       return res.status(200).json({
         success: true,
