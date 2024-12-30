@@ -13,13 +13,13 @@ const jwt = require("jsonwebtoken");
 app.use(helmet());
 const mongooseAggregatorPaginate = require("mongoose-aggregate-paginate-v2");
 
-const rateLimit = require("express-rate-limit");
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
+// const rateLimit = require("express-rate-limit");
+// const limiter = rateLimit({
+//   windowMs: 15 * 60 * 1000,
+//   max: 100,
+// });
 
-app.use(limiter);
+// app.use(limiter);
 
 const {
   validateTicketInput,
@@ -37,7 +37,7 @@ const {
   initializingPassport,
   isAuthenticated,
 } = require("./passportconfig.js");
-const { default: mongoose } = require("mongoose");
+const { mongoose } = require("mongoose");
 const Order = require("./models/ordersModel.js");
 const OrderItem = require("./models/orderItem.model.js");
 const Ticket = require("./models/ticket.Model.js");
@@ -83,7 +83,9 @@ app.use(
 
 app.use("/auth", require("./routes/auth.js"));
 
-mongoose.connect(process.env.MONGO_URI);
+
+ mongoose.connect(process.env.MONGO_URI);
+
 
 app.get("/auth/v1/isAuthenticated", isAuthenticated, async (req, res) => {
   res.status(200).json({
@@ -688,6 +690,7 @@ app.get("/cart", isAuthenticated, isVerified, async (req, res) => {
       const cartItems = user.cart.map(async (item) => {
         const product = await Product.findById(item.product);
         return {
+          orderItem: item._id,
           id: product._id,
           name: product.title,
           price: product.price,
@@ -719,6 +722,44 @@ app.get("/cart", isAuthenticated, isVerified, async (req, res) => {
   }
 });
 
+// changing the quantity of products in cart
+app.post("/cart/changeQuantity", isAuthenticated, isVerified, async (req,res)=>{
+  try {
+    const orderItemId = req.body?.productId
+    const newQuantity = req.body?.newQuantity
+    console.log(orderItemId)
+    console.log(newQuantity)
+    if(!orderItemId || !newQuantity
+    ){
+      return res.status(400).json({
+        message:"Invalid request data",
+        success:"false"
+      })
+    }
+    const orderItem = await OrderItem.findById(orderItemId)
+    if(!orderItem){
+      return res.status(404).json({
+        message:"Order Item not found",
+        success:false
+      })
+    }
+    orderItem.quantity = newQuantity
+    const updatedOrderItem = await orderItem.save()
+    
+    return res.status(204).json({
+      message:"Quantity changed successfully",
+      success:true,
+      data:updatedOrderItem,
+    })
+  } catch (error) {
+    console.log(error)
+    return res.status(500).json({
+      message:"Something Went Wrong",
+      success:false
+    })
+  }
+})
+
 // Add product to cart
 app.post("/cart/add", isAuthenticated, isVerified, async (req, res) => {
   try {
@@ -738,13 +779,30 @@ app.post("/cart/add", isAuthenticated, isVerified, async (req, res) => {
         success: false,
       });
     }
-    const orderItem = new OrderItem({
+    const user = await User.findById(userId);
+    const orderItems = await Promise.all(user.cart.map(async(orderItemId)=>{
+      const orderItem = await OrderItem.findById(orderItemId);
+      return orderItem;
+    }));
+
+    let alreadyInCart = null;
+    orderItems.forEach((orderItem) => {
+      if (orderItem?.product.toString() === productId._id.toString()) {
+        alreadyInCart = orderItem;
+      }
+    });
+
+    if (alreadyInCart) {
+      alreadyInCart.quantity += quantity;
+      await alreadyInCart.save();
+    } else {
+      const newOrderItem = new OrderItem({
       quantity: quantity,
       product: productId._id,
-    });
-    await orderItem.save();
-    const user = await User.findById(userId);
-    user.cart.push(orderItem._id);
+      });
+      await newOrderItem.save();
+      user.cart.push(newOrderItem._id);
+    }
     await user.save();
     res.status(200).json({
       success: true,
@@ -771,9 +829,11 @@ app.delete(
       const productId = req.params.productId;
       const user = await User.findById(userId);
       const index = user.cart.indexOf(productId);
+      console.log(productId)
       console.log(user.cart)
+      console.log(index)
       if (index > -1) {
-        user.cart.splice(index, index);
+        user.cart.splice(index, 1);
       }
       console.log(user.cart)
       await user.save();
